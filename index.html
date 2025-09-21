@@ -1,0 +1,3349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Asistencia QR - DS Global</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Agregar DENTRO del <head> de tu HTML -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="DS Asistencia">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #667eea 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .company-logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            object-fit: cover;
+            border: 3px solid #667eea;
+        }
+
+        .default-logo {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #1e3c72;
+            font-size: 26px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto 25px;
+        }
+
+        #scanner {
+            width: 100%;
+            height: 320px;
+            border-radius: 20px;
+            object-fit: cover;
+            background: #000;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 220px;
+            border: 4px solid #667eea;
+            border-radius: 20px;
+            background: transparent;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(102, 126, 234, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            border: 2px solid #667eea;
+            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            box-shadow: 0 5px 20px rgba(231, 76, 60, 0.3);
+        }
+
+        .btn-small {
+            width: auto;
+            padding: 10px 16px;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #1e3c72;
+            font-size: 15px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid #e1e8ed;
+            border-radius: 15px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+
+        .status-message {
+            padding: 18px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            text-align: center;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-success {
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(39, 174, 96, 0.1));
+            color: #27ae60;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .status-error {
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.1));
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .status-warning {
+            background: linear-gradient(135deg, rgba(241, 196, 15, 0.15), rgba(243, 156, 18, 0.1));
+            color: #f39c12;
+            border: 1px solid rgba(241, 196, 15, 0.3);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .qr-display {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .qr-display canvas {
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            margin: 15px 0;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .time-display {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e3c72;
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 12px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            line-height: 1.3;
+        }
+
+        .list-container {
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .list-container::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+            border-radius: 3px;
+        }
+
+        .list-container::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 3px;
+        }
+
+        .item-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .item-card:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-title {
+            font-weight: 600;
+            color: #1e3c72;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .item-subtitle {
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .attendance-record {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            border-left: 5px solid #27ae60;
+            transition: all 0.3s ease;
+        }
+
+        .attendance-record:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: translateX(5px);
+        }
+
+        .cache-status {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .grid-btn {
+            width: 100%;
+            padding: 15px 10px;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .qr-info {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 13px;
+            color: #1e3c72;
+            text-align: left;
+        }
+
+        .location-info {
+            background: rgba(46, 204, 113, 0.1);
+            border: 1px solid rgba(46, 204, 113, 0.2);
+            border-radius: 12px;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 12px;
+            color: #27ae60;
+        }
+
+        .worker-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-left: 6px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .worker-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .worker-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .status-active {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+
+        .status-in-shift {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+
+        .status-finished {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .status-not-marked {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .qr-container {
+            position: relative;
+            display: inline-block;
+            margin: 15px auto;
+        }
+
+        .qr-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #1e3c72;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border: 2px solid #667eea;
+        }
+
+        /* Responsividad */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+                max-width: 100%;
+            }
+
+            .card {
+                padding: 20px;
+                margin-bottom: 15px;
+            }
+
+            .admin-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .item-actions {
+                flex-direction: column;
+                gap: 6px;
+                min-width: 120px;
+            }
+
+            .btn-small {
+                width: 100%;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .scanner-container {
+                max-width: 280px;
+            }
+
+            #scanner {
+                height: 280px;
+            }
+
+            .scanner-overlay {
+                width: 180px;
+                height: 180px;
+            }
+
+            .worker-card {
+                padding: 15px;
+            }
+            .time-display {
+                font-size: 12px;
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+
+            /* Mejorar badges en móvil */
+            .worker-card div[style*="display: flex"][style*="gap: "] {
+                gap: 4px !important;
+            }
+
+            .worker-card div[style*="background: #9b59b6"] {
+                font-size: 9px !important;
+                padding: 2px 4px !important;
+            }
+
+            .qr-display {
+                padding: 15px;
+            }
+
+            .qr-overlay {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cache-status" id="cacheStatus">Conectando...</div>
+
+    <div class="container">
+        <div class="header">
+            <div id="companyLogoContainer">
+                <div class="company-logo default-logo">DS</div>
+            </div>
+            <h1 id="companyName">DS Global</h1>
+            <p class="subtitle">Sistema de Asistencia con QR</p>
+            <div class="time-display" id="currentTime"></div>
+        </div>
+
+        <!-- Vista de Escáner -->
+        <div class="card" id="scannerView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72; font-size: 22px;">
+                Escáner de QR Personal
+            </h2>
+            <div class="scanner-container">
+                <video id="scanner" autoplay muted playsinline></video>
+                <div class="scanner-overlay"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="toggleCamera()" id="cameraBtn">
+                Activar Cámara
+            </button>
+            <button class="btn btn-primary" onclick="showAdminLogin()">
+                Acceso Administrador
+            </button>
+        </div>
+
+        <!-- Login Administrador -->
+        <div class="card hidden" id="loginView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                Login Administrador
+            </h2>
+            <form onsubmit="return false;">
+                <div class="form-group">
+                    <label class="form-label">Usuario</label>
+                    <input type="text" class="form-input" id="adminUser" placeholder="Ingrese usuario">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input type="password" class="form-input" id="adminPass" placeholder="Ingrese contraseña">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="adminLogin()">Ingresar</button>
+                <button type="button" class="btn btn-secondary" onclick="showScanner()">Volver</button>
+            </form>
+        </div>
+
+        <!-- Panel Administrador -->
+        <div class="card hidden" id="adminPanel">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                Panel Administrador - Sistema QR
+            </h2>
+            <div class="admin-grid">
+                <button class="btn btn-primary grid-btn" onclick="showWorkerCards()">Trabajadores</button>
+                <button class="btn btn-primary grid-btn" onclick="showAttendanceRecords()">Registros</button>
+                <button class="btn btn-primary grid-btn" onclick="showReports()">Reportes</button>
+                <button class="btn btn-primary grid-btn" onclick="syncAllData()">Sincronizar</button>
+            </div>
+            <button class="btn btn-secondary" onclick="probarNotificacion()" style="margin-bottom: 10px;">
+                Probar Notificación
+            </button>
+            <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+        </div>
+
+        <!-- Gestión de Trabajadores -->
+        <div class="card hidden" id="workerManagement">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                Trabajadores
+            </h2>
+            <button class="btn btn-secondary" onclick="showAdminPanel()">Volver</button>
+            <div id="workerList" class="list-container" style="margin-top: 25px;"></div>
+        </div>
+
+        <!-- QR Individual de Trabajador -->
+        <div class="card hidden" id="workerQRView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                QR Personal del Trabajador
+            </h2>
+            <div class="qr-display" id="workerQRDisplay"></div>
+            <div class="admin-grid">
+                <button class="btn btn-secondary grid-btn" onclick="downloadWorkerQR()">Descargar</button>
+                <button class="btn btn-secondary grid-btn" onclick="shareWorkerQR()">Compartir</button>
+            </div>
+            <button class="btn btn-secondary" onclick="showWorkerCards()">Volver</button>
+        </div>
+
+        <!-- Registros de Asistencia -->
+        <div class="card hidden" id="attendanceView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                Registros de Asistencia
+            </h2>
+            <div class="admin-grid">
+                <button class="btn btn-small btn-secondary grid-btn" onclick="exportAttendance()">Exportar</button>
+                <button class="btn btn-small btn-secondary grid-btn" onclick="cleanOldRecords()">Limpiar</button>
+            </div>
+            <div id="attendanceList" class="list-container"></div>
+            <button class="btn btn-secondary" onclick="showAdminPanel()">Volver</button>
+        </div>
+
+        <!-- Historial Individual -->
+        <div class="card hidden" id="workerHistoryView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;" id="historyTitle">
+                Historial de Asistencia
+            </h2>
+            <div id="workerHistoryList" class="list-container"></div>
+            <button class="btn btn-secondary" onclick="showWorkerCards()">Volver</button>
+        </div>
+
+        <!-- Reportes -->
+        <div class="card hidden" id="reportsView">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #1e3c72;">
+                Reportes de Asistencia
+            </h2>
+
+            <div class="form-group">
+                <label class="form-label">Periodo</label>
+                <select class="form-input" id="reportPeriod">
+                    <option value="today">Hoy</option>
+                    <option value="week">Esta semana</option>
+                    <option value="month">Este mes</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+            </div>
+
+            <div class="form-group hidden" id="customDateRange">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label class="form-label">Fecha inicio</label>
+                        <input type="date" class="form-input" id="startDate">
+                    </div>
+                    <div>
+                        <label class="form-label">Fecha fin</label>
+                        <input type="date" class="form-input" id="endDate">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="generateReport()">Generar Reporte</button>
+            <button class="btn btn-secondary" onclick="showAdminPanel()">Volver</button>
+
+            <div id="reportResults" style="margin-top: 25px;"></div>
+        </div>
+
+        <!-- Mensajes de Estado -->
+        <div id="statusMessage"></div>
+    </div>
+
+    <script>
+        // Configuración Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDtLQ0jVPxoq343BRiBU-c0td5xfx2BCCQ",
+            authDomain: "ds-global-spa.firebaseapp.com",
+            projectId: "ds-global-spa",
+            storageBucket: "ds-global-spa.firebasestorage.app",
+            messagingSenderId: "347105301019",
+            appId: "1:347105301019:web:18232f459bd29d2d085ebe"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Variables globales
+        let currentStream = null;
+        let isScanning = false;
+        let currentLocation = null;
+        let adminAuth = false;
+        let currentAdmin = null;
+        let currentWorkerQR = null;
+        let firebaseReady = false;
+        let companyData = null;
+        let companyLogo = null;
+
+        // Cache para funcionamiento offline
+        const cache = {
+            workers: JSON.parse(localStorage.getItem('workers') || '[]'),
+            workplaces: JSON.parse(localStorage.getItem('workplaces') || '[]'),
+            turns: JSON.parse(localStorage.getItem('turns') || '[]'),
+            pendingRecords: JSON.parse(localStorage.getItem('pendingRecords') || '[]'),
+            company: JSON.parse(localStorage.getItem('company') || 'null'),
+            logo: localStorage.getItem('companyLogo') || null,
+            lastSync: localStorage.getItem('lastSync') || null
+        };
+
+        // Configurar autenticación Firebase
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('Usuario autenticado:', user.uid);
+                firebaseReady = true;
+                updateCacheStatus();
+                syncPendingRecords();
+                loadCompanyData();
+                setInterval(syncAllData, 300000);
+            } else {
+                console.log('Iniciando autenticación anónima...');
+                // AGREGAR TIMEOUT PARA NETLIFY:
+                const authTimeout = setTimeout(() => {
+                    console.log('Timeout de autenticación, trabajando offline');
+                    firebaseReady = false;
+                    updateCacheStatus();
+                    if (cache.company) updateCompanyDisplay(cache.company);
+                    if (cache.logo) updateCompanyLogo(cache.logo);
+                }, 10000); // 10 segundos timeout
+
+                auth.signInAnonymously().then(() => {
+                    clearTimeout(authTimeout);
+                }).catch((error) => {
+                    console.error('Error de autenticación:', error);
+                    clearTimeout(authTimeout);
+                    firebaseReady = false;
+                    updateCacheStatus();
+                    if (cache.company) updateCompanyDisplay(cache.company);
+                    if (cache.logo) updateCompanyLogo(cache.logo);
+                });
+            }
+        });
+
+        // Cargar datos de la empresa
+        async function loadCompanyData() {
+            try {
+
+                // Cargar datos de la empresa desde cache
+                if (cache.company) {
+
+                    updateCompanyDisplay(cache.company);
+                } else {
+
+                }
+
+                if (firebaseReady && navigator.onLine) {
+
+
+                    const companySnapshot = await db.collection('empresa').limit(1).get();
+
+                    if (!companySnapshot.empty) {
+                        companyData = companySnapshot.docs[0].data();
+
+
+                        cache.company = companyData;
+                        localStorage.setItem('company', JSON.stringify(companyData));
+                        updateCompanyDisplay(companyData);
+                    } else {
+
+                    }
+
+                    // Cargar logo de la empresa
+                    const logoSnapshot = await db.collection('logo_empresa').limit(1).get();
+                    if (!logoSnapshot.empty) {
+                        const logoData = logoSnapshot.docs[0].data();
+                        if (logoData.imagen) {
+
+                            companyLogo = logoData.imagen;
+                            cache.logo = companyLogo;
+                            localStorage.setItem('companyLogo', companyLogo);
+                            updateCompanyLogo(companyLogo);
+                        } else {
+
+                        }
+                    } else {
+
+                    }
+                } else {
+
+                }
+
+                // Si hay logo en cache, usarlo
+                if (cache.logo) {
+                    updateCompanyLogo(cache.logo);
+                }
+
+            } catch (error) {
+
+                console.error('Error cargando datos de empresa:', error);
+            }
+        }
+
+        function updateCompanyDisplay(company) {
+            if (company && company.razon_social) {
+                document.getElementById('companyName').textContent = company.razon_social;
+                document.title = `Sistema de Asistencia QR - ${company.razon_social}`;
+            }
+        }
+
+        function updateCompanyLogo(logoBase64) {
+            const logoContainer = document.getElementById('companyLogoContainer');
+            if (logoBase64) {
+                logoContainer.innerHTML = `<img src="${logoBase64}" alt="Logo Empresa" class="company-logo">`;
+            }
+        }
+
+        // Función para sincronizar todos los datos
+        async function syncAllData() {
+            if (!firebaseReady || !navigator.onLine) {
+                showMessage('Sin conexión a internet', 'warning');
+                return;
+            }
+
+            try {
+                showMessage('Sincronizando datos...', 'warning');
+
+                let syncCount = 0;
+
+                // Sincronizar trabajadores
+                const workersSnapshot = await db.collection('trabajadores')
+                    .where('eliminado', '==', false)
+                    .get();
+
+                const newWorkers = [];
+                workersSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    newWorkers.push({
+                        rut: data.rut,
+                        nombre: data.nombre,
+                        apellido: data.apellido || '',
+                        telefono: data.telefono || '',
+                        tipo_trabajador: data.tipo_trabajador,
+                        lugares_trabajo: data.lugares_trabajo || [],
+                        usuario: data.usuario,
+                        password: data.password,
+                        turno: data.turno || 'dia',
+                        tipo_turno: data.tipo_turno,
+                        fecha_ingreso: data.fecha_ingreso,
+                        eliminado: data.eliminado || false,
+                        activo: !data.eliminado
+                    });
+                });
+
+                if (newWorkers.length !== cache.workers.length) {
+                    cache.workers = newWorkers;
+                    saveToCache('workers', cache.workers);
+                    syncCount++;
+                }
+
+                // Sincronizar lugares de trabajo
+                const placesSnapshot = await db.collection('lugar_trabajo').get();
+                const newWorkplaces = [];
+                placesSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    newWorkplaces.push({
+                        id: doc.id,
+                        nombre: data.nombre_lugar,
+                        ubicacion: data.ubicacion || {},
+                        tolerancia: data.tolerancia || 15,
+                        horario_dia: data.horario_dia || {},
+                        horario_noche: data.horario_noche || {},
+                        activo: data.activo !== false
+                    });
+                });
+
+                if (newWorkplaces.length !== cache.workplaces.length) {
+                    cache.workplaces = newWorkplaces;
+                    saveToCache('workplaces', cache.workplaces);
+                    syncCount++;
+                }
+
+                // Sincronizar tipos de turno
+                const turnsSnapshot = await db.collection('tipos_turno').get();
+                const newTurns = [];
+                turnsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    newTurns.push({
+                        id: doc.id,
+                        nombre: data.nombre,
+                        diasTrabajo: data.diasTrabajo || 0,
+                        diasDescanso: data.diasDescanso || 0,
+                        descripcion: data.descripcion || ''
+                    });
+                });
+
+                if (newTurns.length !== cache.turns.length) {
+                    cache.turns = newTurns;
+                    saveToCache('turns', cache.turns);
+                    syncCount++;
+                }
+
+                // Sincronizar datos de empresa
+                await loadCompanyData();
+
+                // Sincronizar registros pendientes
+                await syncPendingRecords();
+
+                cache.lastSync = new Date().toISOString();
+                localStorage.setItem('lastSync', cache.lastSync);
+
+                console.log('Datos sincronizados correctamente');
+                updateCacheStatus();
+
+                if (syncCount > 0) {
+                    showMessage(`Sincronización completada: ${syncCount} colecciones actualizadas`, 'success');
+                } else {
+                    showMessage('Datos ya están actualizados', 'success');
+                }
+
+            } catch (error) {
+                console.error('Error sincronizando datos:', error);
+                showMessage('Error al sincronizar: ' + error.message, 'error');
+            }
+        }
+
+        // Función para sincronizar registros pendientes
+        async function syncPendingRecords() {
+            if (!firebaseReady || !navigator.onLine || cache.pendingRecords.length === 0) return;
+
+            const recordsToSync = [...cache.pendingRecords];
+
+            for (let i = 0; i < recordsToSync.length; i++) {
+                const record = recordsToSync[i];
+                try {
+                    // Generar ID único para el documento
+                    const docId = `${record.rut}_${record.fecha}_${new Date(record.timestamp).getTime()}`;
+
+                    await db.collection('asistencias').doc(docId).set({
+                        ...record,
+                        timestamp: new Date(record.timestamp),
+                        client_time: record.client_time || new Date(record.timestamp).toString(),
+                        fecha_manual: record.fecha,
+                        rut: record.rut,
+                        trabajador_id: record.rut
+                    });
+
+                    // Remover el registro sincronizado
+                    cache.pendingRecords.splice(cache.pendingRecords.indexOf(record), 1);
+                    console.log(`Registro sincronizado: ${record.rut} - ${record.fecha}`);
+
+                } catch (error) {
+                    console.error('Error syncing record:', error);
+                    break; // Detener si hay error
+                }
+            }
+
+            saveToCache('pendingRecords', cache.pendingRecords);
+            updateCacheStatus();
+        }
+
+        function saveToCache(key, data) {
+            cache[key] = data;
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+
+        // Funciones de Cache y Estado
+        function updateCacheStatus() {
+            const statusElement = document.getElementById('cacheStatus');
+            const pendingCount = cache.pendingRecords.length;
+
+            if (!navigator.onLine) {
+                statusElement.textContent = `Offline (${pendingCount} pendientes)`;
+                statusElement.style.backgroundColor = 'rgba(231, 76, 60, 0.9)';
+            } else if (!firebaseReady) {
+                statusElement.textContent = 'Conectando...';
+                statusElement.style.backgroundColor = 'rgba(243, 156, 18, 0.9)';
+            } else if (pendingCount > 0) {
+                statusElement.textContent = `Online (${pendingCount} pendientes)`;
+                statusElement.style.backgroundColor = 'rgba(243, 156, 18, 0.9)';
+            } else {
+                statusElement.textContent = 'Online';
+                statusElement.style.backgroundColor = 'rgba(46, 204, 113, 0.9)';
+            }
+        }
+
+        // Funciones de notificación
+        async function solicitarPermisosNotificacion() {
+            if ('Notification' in window) {
+                if (Notification.permission === 'default') {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        console.log('Permisos de notificación concedidos');
+                        showMessage('Notificaciones activadas para administradores', 'success');
+                    } else {
+                        console.log('Permisos de notificación denegados');
+                    }
+                }
+            } else {
+                console.log('Este navegador no soporta notificaciones');
+            }
+        }
+
+        function enviarNotificacionLocal(record) {
+            // Solo enviar si hay un admin logueado o si es una marcación exitosa
+            if (!adminAuth && !record.rut) return;
+
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                console.log('Notificaciones no disponibles o sin permisos');
+                return;
+            }
+
+            const tipoEmoji = record.hora_entrada ? '🚪➡️' : '🚪⬅️';
+            const tipo = record.hora_entrada ? 'ENTRADA' : 'SALIDA';
+            const hora = new Date().toLocaleTimeString('es-CL', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const notification = new Notification(`${tipoEmoji} Marcación de ${tipo}`, {
+                body: `${record.nombre_trabajador} marcó ${tipo.toLowerCase()} en ${record.lugar_trabajo} a las ${hora}`,
+                icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAxIDkgMTQgOVYxMUMxNCA5IDkgMTMuMSA5IDEySDlWMTJDOSAxMC45IDEwIDEwIDExIDEwUzEzIDEwIDkgMTMgMTFWOVpNMTggMTdIMTJMMTAgMTVIMTNMNSAxNVY4VjVIMTlWMTdaIi8+Cjwvc3ZnPgo8L3N2Zz4K',
+                tag: 'asistencia-' + record.rut + '-' + Date.now(),
+                requireInteraction: true,
+                silent: false,
+                vibrate: [200, 100, 200],
+                data: {
+                    trabajador: record.nombre_trabajador,
+                    rut: record.rut,
+                    tipo: tipo,
+                    lugar: record.lugar_trabajo,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            // Auto-cerrar después de 15 segundos
+            setTimeout(() => {
+                try {
+                    notification.close();
+                } catch (e) {
+                    // Ignorar errores si la notificación ya se cerró
+                }
+            }, 15000);
+
+            // Evento al hacer click en la notificación
+            notification.onclick = function() {
+                window.focus();
+                try {
+                    notification.close();
+                } catch (e) {
+                    // Ignorar errores
+                }
+
+                // Si hay admin logueado, mostrar registros de asistencia
+                if (adminAuth) {
+                    showAttendanceRecords();
+                }
+            };
+
+            // Evento cuando se cierra la notificación
+            notification.onclose = function() {
+                console.log('Notificación cerrada');
+            };
+
+            console.log('Notificación enviada:', tipo, 'para', record.nombre_trabajador);
+        }
+
+        // Función para probar notificaciones (solo para testing)
+        function probarNotificacion() {
+            if (Notification.permission === 'granted') {
+                const testRecord = {
+                    nombre_trabajador: 'Usuario de Prueba',
+                    rut: '12345678-9',
+                    lugar_trabajo: 'Oficina Central',
+                    hora_entrada: new Date().toISOString(),
+                    hora_salida: null
+                };
+                enviarNotificacionLocal(testRecord);
+                showMessage('Notificación de prueba enviada', 'success');
+            } else {
+                showMessage('Debe permitir notificaciones primero', 'warning');
+                solicitarPermisosNotificacion();
+            }
+        }
+
+        // Actualizar reloj
+        function updateClock() {
+            const now = new Date();
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZone: 'America/Santiago'
+            };
+            const timeString = now.toLocaleString('es-CL', options);
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // Gestión de vistas
+        function hideAllViews() {
+            const views = ['scannerView', 'loginView', 'adminPanel', 'workerManagement',
+                          'workerQRView', 'attendanceView', 'workerHistoryView', 'reportsView'];
+            views.forEach(view => {
+                const element = document.getElementById(view);
+                if (element) {
+                    element.classList.add('hidden');
+                }
+            });
+        }
+
+        function showScanner() {
+            hideAllViews();
+            document.getElementById('scannerView').classList.remove('hidden');
+        }
+
+        function showAdminLogin() {
+            hideAllViews();
+            document.getElementById('loginView').classList.remove('hidden');
+            document.getElementById('adminUser').value = '';
+            document.getElementById('adminPass').value = '';
+        }
+
+        function showAdminPanel() {
+            hideAllViews();
+            document.getElementById('adminPanel').classList.remove('hidden');
+        }
+
+        function showWorkerCards() {
+            hideAllViews();
+            document.getElementById('workerManagement').classList.remove('hidden');
+            loadWorkerCards();
+        }
+
+        function showAttendanceRecords() {
+            hideAllViews();
+            document.getElementById('attendanceView').classList.remove('hidden');
+            loadAttendanceRecords();
+        }
+
+
+        function showReports() {
+            hideAllViews();
+            document.getElementById('reportsView').classList.remove('hidden');
+
+            // Event listener para mostrar/ocultar fechas personalizadas
+            document.getElementById('reportPeriod').addEventListener('change', function() {
+                const customRange = document.getElementById('customDateRange');
+                if (this.value === 'custom') {
+                    customRange.classList.remove('hidden');
+                } else {
+                    customRange.classList.add('hidden');
+                }
+            });
+        }
+
+        // Mostrar mensajes
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.getElementById('statusMessage');
+            messageDiv.className = `status-message status-${type}`;
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Autenticación usando datos de Firebase
+        async function adminLogin() {
+            const user = document.getElementById('adminUser').value.toLowerCase().trim();
+            const pass = document.getElementById('adminPass').value;
+
+            if (!user || !pass) {
+                showMessage('Complete todos los campos', 'error');
+                return;
+            }
+
+            try {
+                // Primero intentar con cache si no hay conexión
+                if (!navigator.onLine || !firebaseReady) {
+                    // Verificar super admin desde cache de empresa
+                    if (cache.company &&
+                        cache.company.usuario_empresa &&
+                        cache.company.usuario_empresa.toLowerCase() === user &&
+                        cache.company.password_empresa === pass) {
+
+                        adminAuth = true;
+                        currentAdmin = {
+                            nombre: cache.company.representante_legal || 'Super Administrador',
+                            tipo_trabajador: 'super_administrador',
+                            rut: cache.company.rut_representante || 'SUPER-ADMIN'
+                        };
+                        showAdminPanel();
+                        showMessage(`Bienvenido ${currentAdmin.nombre} (modo offline)`, 'success');
+                        return;
+                    }
+
+                    // Verificar admin/supervisor desde cache de trabajadores
+                    const adminFromCache = cache.workers.find(w =>
+                        w.usuario && w.usuario.toLowerCase() === user &&
+                        w.password === pass &&
+                        (w.tipo_trabajador === 'administrador' || w.tipo_trabajador === 'supervisor') &&
+                        !w.eliminado
+                    );
+
+                    if (adminFromCache) {
+                        adminAuth = true;
+                        currentAdmin = adminFromCache;
+                        showAdminPanel();
+                        showMessage(`Bienvenido ${adminFromCache.nombre} (modo offline)`, 'success');
+                        return;
+                    } else {
+                        showMessage('Usuario o contraseña incorrectos', 'error');
+                        return;
+                    }
+                }
+
+                // Verificar super administrador desde Firebase (empresa)
+                try {
+                    const empresaSnapshot = await db.collection('empresa').limit(1).get();
+
+                    if (!empresaSnapshot.empty) {
+                        const empresaData = empresaSnapshot.docs[0].data();
+
+                        if (empresaData.usuario_empresa &&
+                            empresaData.usuario_empresa.toLowerCase() === user &&
+                            empresaData.password_empresa === pass) {
+
+                            adminAuth = true;
+                            currentAdmin = {
+                                nombre: empresaData.representante_legal || 'Super Administrador',
+                                tipo_trabajador: 'super_administrador',
+                                rut: empresaData.rut_representante || 'SUPER-ADMIN',
+                                empresa_data: empresaData
+                            };
+                            showAdminPanel();
+                            showMessage(`Bienvenido ${currentAdmin.nombre} (Super Admin)`, 'success');
+
+                            // Actualizar cache de empresa si es necesario
+                            if (!cache.company || JSON.stringify(cache.company) !== JSON.stringify(empresaData)) {
+                                cache.company = empresaData;
+                                localStorage.setItem('company', JSON.stringify(empresaData));
+                                updateCompanyDisplay(empresaData);
+                            }
+
+                            // Sincronizar datos después del login
+                            await syncAllData();
+                            return;
+                        }
+                    }
+                } catch (empresaError) {
+                    console.log('Error verificando super admin:', empresaError);
+                }
+
+                // Buscar administrador/supervisor en trabajadores
+                const snapshot = await db.collection('trabajadores')
+                    .where('usuario', '==', user)
+                    .where('eliminado', '==', false)
+                    .get();
+
+                if (snapshot.empty) {
+                    showMessage('Usuario o contraseña incorrectos', 'error');
+                    return;
+                }
+
+                let adminEncontrado = null;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.password === pass &&
+                        (data.tipo_trabajador === 'administrador' || data.tipo_trabajador === 'supervisor')) {
+                        adminEncontrado = { id: doc.id, ...data };
+                    }
+                });
+
+                if (!adminEncontrado) {
+                    showMessage('Usuario o contraseña incorrectos', 'error');
+                    return;
+                }
+
+                adminAuth = true;
+                currentAdmin = adminEncontrado;
+                showAdminPanel();
+                showMessage(`Bienvenido ${adminEncontrado.nombre}`, 'success');
+
+                // Sincronizar datos después del login
+                await syncAllData();
+
+            } catch (error) {
+                console.error('Error en login:', error);
+                showMessage('Error al iniciar sesión: ' + error.message, 'error');
+            }
+        }
+
+        function logout() {
+            adminAuth = false;
+            currentAdmin = null;
+            showScanner();
+            showMessage('Sesión cerrada', 'success');
+        }
+
+        // Cargar trabajadores como tarjetas informativas
+        function loadWorkerCards() {
+            const listDiv = document.getElementById('workerList');
+            listDiv.innerHTML = '<p style="text-align: center;">Cargando trabajadores...</p>';
+
+            const trabajadores = cache.workers.filter(w => !w.eliminado);
+
+            if (trabajadores.length === 0) {
+                listDiv.innerHTML = '<p style="text-align: center; color: #7f8c8d;">No hay trabajadores disponibles</p>';
+                return;
+            }
+
+            listDiv.innerHTML = '';
+
+            trabajadores.forEach((worker) => {
+                const workerCard = document.createElement('div');
+                workerCard.className = 'worker-card';
+
+                // Manejar múltiples lugares de trabajo
+                let lugaresTrabajoTexto = 'Sin asignar';
+                let tieneMultiplesLugares = false;
+
+                if (worker.lugares_trabajo && worker.lugares_trabajo.length > 0) {
+                    if (worker.lugares_trabajo.length === 1) {
+                        // Un solo lugar
+                        const lugar = cache.workplaces.find(w => w.id === worker.lugares_trabajo[0]);
+                        lugaresTrabajoTexto = lugar?.nombre || worker.lugares_trabajo[0];
+                    } else {
+                        // Múltiples lugares
+                        tieneMultiplesLugares = true;
+                        const nombresLugares = worker.lugares_trabajo.map(lugarId => {
+                            const lugar = cache.workplaces.find(w => w.id === lugarId);
+                            return lugar?.nombre || lugarId;
+                        });
+                        lugaresTrabajoTexto = `${nombresLugares.length} lugares asignados`;
+                    }
+                }
+
+                const tipoTurno = worker.tipo_turno ?
+                    cache.turns.find(t => t.id === worker.tipo_turno)?.nombre || worker.tipo_turno :
+                    'No asignado';
+
+                const turnoTexto = worker.turno === 'dia' ? 'Día' :
+                                  worker.turno === 'noche' ? 'Noche' :
+                                  'Variable';
+
+                // Calcular estado actual del trabajador
+                let estadoActual = 'Desconocido';
+                let colorEstado = '#999999';
+
+                const hoy = new Date().toISOString().split('T')[0];
+                const registrosHoy = cache.pendingRecords.filter(r =>
+                    r.rut === worker.rut && r.fecha === hoy
+                ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                if (registrosHoy.length > 0) {
+                    const ultimoRegistro = registrosHoy[0];
+                    if (ultimoRegistro.hora_entrada && !ultimoRegistro.hora_salida) {
+                        estadoActual = 'En turno';
+                        colorEstado = '#27ae60';
+                    } else if (ultimoRegistro.hora_salida) {
+                        estadoActual = 'Terminó turno';
+                        colorEstado = '#3498db';
+                    }
+                } else {
+                    estadoActual = 'No ha marcado';
+                    colorEstado = '#e74c3c';
+                }
+
+                // Determinar si es trabajador flotante
+                const esFlotante = worker.tipo_turno && (
+                    worker.tipo_turno.toLowerCase().includes('0x0') ||
+                    worker.tipo_turno.toLowerCase().includes('flotante') ||
+                    tipoTurno.toLowerCase().includes('0x0') ||
+                    tipoTurno.toLowerCase().includes('flotante')
+                );
+
+                workerCard.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                        <div>
+                            <h3 style="color: #1e3c72; font-size: 20px; margin: 0 0 5px 0;">
+                                ${worker.nombre} ${worker.apellido || ''}
+                            </h3>
+                            <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;">
+                                <div style="background: ${colorEstado}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap;">
+                                    ${estadoActual}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="background: #667eea; color: white; padding: 6px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap;">
+                                ${worker.tipo_trabajador.toUpperCase().replace('GUARDIA_FLOTANTE', 'G. FLOTANTE').replace('GUARDIA FLOTANTE', 'G. FLOTANTE')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">RUT</div>
+                            <div style="color: #2c3e50; font-weight: 600;">${worker.rut}</div>
+                        </div>
+
+                        <div>
+                            <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">TURNO</div>
+                            <div style="color: #2c3e50; font-weight: 600;">${turnoTexto}</div>
+                        </div>
+
+                        <div>
+                            <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">TIPO DE TURNO</div>
+                            <div style="color: #2c3e50; font-weight: 600;">${tipoTurno}</div>
+                        </div>
+
+                        ${worker.telefono ? `
+                        <div>
+                            <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">TELÉFONO</div>
+                            <div style="color: #2c3e50; font-weight: 600;">${worker.telefono}</div>
+                        </div>
+                        ` : `
+                        <div>
+                            <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">FECHA INGRESO</div>
+                            <div style="color: #2c3e50; font-weight: 600;">
+                                ${worker.fecha_ingreso ? new Date(worker.fecha_ingreso).toLocaleDateString('es-CL') : 'No registrada'}
+                            </div>
+                        </div>
+                        `}
+                    </div>
+
+                    <!-- Sección de lugares de trabajo -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="color: #7f8c8d; font-size: 12px; text-transform: uppercase; font-weight: 600; margin-bottom: 8px;">
+                            ${tieneMultiplesLugares ? 'LUGARES DE TRABAJO' : 'LUGAR DE TRABAJO'}
+                        </div>
+                        ${tieneMultiplesLugares ? `
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                ${worker.lugares_trabajo.map(lugarId => {
+                                    const lugar = cache.workplaces.find(w => w.id === lugarId);
+                                    const nombreLugar = lugar?.nombre || lugarId;
+                                    return `<span style="background: rgba(102, 126, 234, 0.1); color: #667eea; padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; border: 1px solid rgba(102, 126, 234, 0.3);">${nombreLugar}</span>`;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <div style="color: #2c3e50; font-weight: 600;">${lugaresTrabajoTexto}</div>
+                        `}
+                    </div>
+
+                    <div style="border-top: 1px solid #ecf0f1; padding-top: 15px;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${worker.lugares_trabajo && worker.lugares_trabajo.length > 0 ? `
+                                <button class="btn btn-primary" onclick="generateWorkerQR('${worker.rut}')" style="flex: 1; min-width: 120px;">
+                                    Generar QR
+                                </button>
+                            ` : `
+                                <div style="flex: 1; text-align: center; color: #e74c3c; font-size: 14px; padding: 10px;">
+                                    Sin lugar asignado - No se puede generar QR
+                                </div>
+                            `}
+                            <button class="btn btn-secondary" onclick="showWorkerHistory('${worker.rut}')" style="flex: 1; min-width: 120px;">
+                                Ver Historial
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                listDiv.appendChild(workerCard);
+            });
+        }
+
+
+        function showWorkerQROptions(workerRut) {
+            const worker = cache.workers.find(w => w.rut === workerRut);
+            if (!worker || !worker.lugares_trabajo || worker.lugares_trabajo.length <= 1) {
+                generateWorkerQR(workerRut);
+                return;
+            }
+
+            // Crear modal con estilos más específicos y aislados
+            const modal = document.createElement('div');
+            modal.className = 'qr-modal-overlay';
+            modal.id = 'qrModal';
+
+            // Usar setAttribute en lugar de cssText para evitar conflictos
+            modal.setAttribute('style',
+                'position: fixed !important; ' +
+                'top: 0 !important; ' +
+                'left: 0 !important; ' +
+                'width: 100% !important; ' +
+                'height: 100% !important; ' +
+                'background: rgba(0,0,0,0.8) !important; ' +
+                'display: flex !important; ' +
+                'align-items: center !important; ' +
+                'justify-content: center !important; ' +
+                'z-index: 99999 !important; ' +
+                'pointer-events: auto !important;'
+            );
+
+            const modalContent = document.createElement('div');
+            modalContent.className = 'qr-modal-content';
+            modalContent.setAttribute('style',
+                'background: white !important; ' +
+                'border-radius: 20px !important; ' +
+                'padding: 30px !important; ' +
+                'max-width: 400px !important; ' +
+                'width: 90% !important; ' +
+                'max-height: 80vh !important; ' +
+                'overflow-y: auto !important; ' +
+                'box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important; ' +
+                'position: relative !important;'
+            );
+
+            // Crear el contenido usando createElement para evitar problemas de parsing
+            const title = document.createElement('h3');
+            title.textContent = 'Seleccionar Lugar de Trabajo';
+            title.setAttribute('style', 'color: #1e3c72; margin-bottom: 20px; text-align: center; margin-top: 0;');
+
+            const subtitle = document.createElement('p');
+            subtitle.textContent = `${worker.nombre} tiene múltiples lugares asignados`;
+            subtitle.setAttribute('style', 'text-align: center; margin-bottom: 20px; color: #666;');
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.setAttribute('style', 'display: flex; flex-direction: column; gap: 12px;');
+
+            // Crear botones para cada lugar
+            worker.lugares_trabajo.forEach(lugarId => {
+                const lugar = cache.workplaces.find(w => w.id === lugarId);
+                const nombreLugar = lugar?.nombre || lugarId;
+
+                const button = document.createElement('button');
+                button.className = 'btn btn-primary';
+                button.textContent = nombreLugar;
+                button.onclick = function() {
+                    generateWorkerQRForPlace(workerRut, lugarId);
+                    closeQRModal();
+                };
+
+                buttonContainer.appendChild(button);
+            });
+
+            // Botón cancelar
+            const cancelButton = document.createElement('button');
+            cancelButton.className = 'btn btn-secondary';
+            cancelButton.textContent = 'Cancelar';
+            cancelButton.onclick = closeQRModal;
+
+            buttonContainer.appendChild(cancelButton);
+
+            // Ensamblar el modal
+            modalContent.appendChild(title);
+            modalContent.appendChild(subtitle);
+            modalContent.appendChild(buttonContainer);
+            modal.appendChild(modalContent);
+
+            // Agregar event listener para cerrar al hacer click fuera
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeQRModal();
+                }
+            });
+
+            // Agregar al DOM
+            document.body.appendChild(modal);
+
+            // Prevenir scroll del body
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeQRModal() {
+            const modal = document.getElementById('qrModal');
+            if (modal) {
+                document.body.removeChild(modal);
+                // Restaurar scroll del body
+                document.body.style.overflow = '';
+            }
+        }
+
+        function generateWorkerQRForPlace(workerRut, lugarId) {
+            const worker = cache.workers.find(w => w.rut === workerRut);
+            if (!worker) {
+                showMessage('Trabajador no encontrado', 'error');
+                return;
+            }
+
+            const lugarTrabajo = cache.workplaces.find(w => w.id === lugarId);
+            if (!lugarTrabajo) {
+                showMessage('Lugar de trabajo no encontrado', 'error');
+                return;
+            }
+
+            if (!lugarTrabajo.ubicacion || !lugarTrabajo.ubicacion.latitud) {
+                showMessage('El lugar de trabajo no tiene coordenadas configuradas', 'error');
+                return;
+            }
+
+            try {
+                // Datos compactos para el QR
+                const qrData = {
+                    t: 'wa', // worker_attendance compacto
+                    r: worker.rut,
+                    n: worker.nombre,
+                    w: lugarId,
+                    wn: lugarTrabajo.nombre,
+                    l: {
+                        a: lugarTrabajo.ubicacion.latitud,
+                        o: lugarTrabajo.ubicacion.longitud
+                    },
+                    tol: lugarTrabajo.tolerancia || 15,
+                    s: {
+                        de: lugarTrabajo.horario_dia?.entrada || '08:00',
+                        ds: lugarTrabajo.horario_dia?.salida || '17:00',
+                        ne: lugarTrabajo.horario_noche?.entrada || '20:00',
+                        ns: lugarTrabajo.horario_noche?.salida || '08:00'
+                    },
+                    tu: worker.turno,
+                    tt: worker.tipo_turno,
+                    vf: new Date().toISOString().split('T')[0], // valid from
+                    vu: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // valid until
+                    sig: CryptoJS.SHA256(
+                        worker.rut +
+                        lugarId +
+                        lugarTrabajo.ubicacion.latitud +
+                        lugarTrabajo.ubicacion.longitud +
+                        'DSGLOBAL2024'
+                    ).toString().substring(0, 16) // Firma compacta
+                };
+
+                // Crear QR
+                const canvas = document.createElement('canvas');
+                const qr = new QRious({
+                    element: canvas,
+                    value: JSON.stringify(qrData),
+                    size: 280,
+                    foreground: '#1e3c72',
+                    background: '#ffffff',
+                    level: 'M'
+                });
+
+                showWorkerQRView(worker, lugarTrabajo, canvas, qrData);
+
+            } catch (error) {
+                console.error('Error generando QR:', error);
+                showMessage('Error al generar QR: ' + error.message, 'error');
+            }
+        }
+
+        // Mostrar historial de un trabajador específico
+        function showWorkerHistory(workerRut) {
+            const worker = cache.workers.find(w => w.rut === workerRut);
+            if (!worker) return;
+
+            hideAllViews();
+            document.getElementById('workerHistoryView').classList.remove('hidden');
+
+            document.getElementById('historyTitle').textContent = `Historial - ${worker.nombre}`;
+
+            // Cargar historial del trabajador
+            loadWorkerHistory(workerRut);
+        }
+
+        async function loadWorkerHistory(workerRut) {
+            const listDiv = document.getElementById('workerHistoryList');
+            listDiv.innerHTML = '<p style="text-align: center;">Cargando historial...</p>';
+
+            let records = [];
+
+            // Registros pendientes
+            records.push(...cache.pendingRecords
+                .filter(r => r.rut === workerRut)
+                .map(r => ({ ...r, isPending: true, timestamp: new Date(r.timestamp) }))
+            );
+
+            // Cargar desde Firebase los últimos 30 días
+            if (firebaseReady && navigator.onLine) {
+                try {
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                    const snapshot = await db.collection('asistencias')
+                        .where('rut', '==', workerRut)
+                        .where('timestamp', '>=', thirtyDaysAgo)
+                        .orderBy('timestamp', 'desc')
+                        .get();
+
+                    const firebaseRecords = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        timestamp: doc.data().timestamp?.toDate() || new Date(),
+                        isPending: false
+                    }));
+
+                    records.push(...firebaseRecords);
+                } catch (error) {
+                    console.log('Error cargando historial:', error);
+                }
+            }
+
+            // Eliminar duplicados y ordenar
+            const uniqueRecords = [];
+            const seen = new Set();
+
+            records.forEach(record => {
+                const key = `${record.fecha}_${record.timestamp.getTime()}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueRecords.push(record);
+                }
+            });
+
+            uniqueRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+            if (uniqueRecords.length === 0) {
+                listDiv.innerHTML = '<p style="text-align: center; color: #7f8c8d;">Sin registros de asistencia</p>';
+                return;
+            }
+
+            listDiv.innerHTML = '';
+
+            uniqueRecords.forEach(record => {
+                const recordDiv = document.createElement('div');
+                recordDiv.className = 'attendance-record';
+
+                const fecha = new Date(record.fecha).toLocaleDateString('es-CL', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                const horaEntrada = record.hora_entrada ?
+                    new Date(record.hora_entrada).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) :
+                    '-';
+
+                const horaSalida = record.hora_salida ?
+                    new Date(record.hora_salida).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) :
+                    '-';
+
+                const estado = record.isPending ? '🔄 Pendiente' : '✅ Sincronizado';
+
+                recordDiv.innerHTML = `
+                    <div>
+                        <strong>${fecha}</strong><br>
+                        <small>📍 ${record.lugar_trabajo || 'No especificado'}</small><br>
+                        <small>🕐 Turno: ${record.tipo_turno_marcado || 'No especificado'}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <div><strong>Entrada:</strong> ${horaEntrada}</div>
+                        <div><strong>Salida:</strong> ${horaSalida}</div>
+                        <small>${estado}</small>
+                    </div>
+                `;
+
+                listDiv.appendChild(recordDiv);
+            });
+        }
+
+        // Función para verificar si es día de trabajo
+        async function esDiaTrabajo(trabajadorRut, fecha) {
+            try {
+                const trabajador = cache.workers.find(w => w.rut === trabajadorRut);
+                if (!trabajador || !trabajador.tipo_turno) return true;
+
+                const tipoTurno = cache.turns.find(t => t.id === trabajador.tipo_turno);
+                if (!tipoTurno) return true;
+
+                const fechaIngreso = new Date(trabajador.fecha_ingreso);
+                const fechaActual = new Date(fecha);
+                const diasTranscurridos = Math.floor((fechaActual - fechaIngreso) / (1000 * 60 * 60 * 24));
+
+                const nombreTipoTurno = tipoTurno.nombre.toUpperCase();
+
+                // Verificar patrones complejos tipo "2D2N2X"
+                if (nombreTipoTurno.includes('D') && nombreTipoTurno.includes('N') && nombreTipoTurno.includes('X')) {
+                    const patronMatch = nombreTipoTurno.match(/^(\d+)D(\d+)N(\d+)X$/);
+                    if (patronMatch) {
+                        const [, diasDia, diasNoche, diasDescanso] = patronMatch;
+                        const duracionCiclo = parseInt(diasDia) + parseInt(diasNoche) + parseInt(diasDescanso);
+
+                        let secuencia = [];
+                        for(let i = 0; i < parseInt(diasDia); i++) secuencia.push('D');
+                        for(let i = 0; i < parseInt(diasNoche); i++) secuencia.push('N');
+                        for(let i = 0; i < parseInt(diasDescanso); i++) secuencia.push('X');
+
+                        const posicionEnCiclo = diasTranscurridos % duracionCiclo;
+                        const tipoJornada = secuencia[posicionEnCiclo];
+
+                        return tipoJornada !== 'X';
+                    }
+                } else if (tipoTurno.diasTrabajo && tipoTurno.diasDescanso) {
+                    // Patrones tradicionales
+                    const duracionCiclo = tipoTurno.diasTrabajo + tipoTurno.diasDescanso;
+                    const posicionEnCiclo = diasTranscurridos % duracionCiclo;
+                    return posicionEnCiclo < tipoTurno.diasTrabajo;
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Error verificando día de trabajo:', error);
+                return true;
+            }
+        }
+
+        // Verificar turnos extras
+        async function tieneTurnoExtraAsignado(trabajadorRut, fecha) {
+            try {
+                if (!firebaseReady || !navigator.onLine) return false;
+
+                const turnoExtraDoc = await db.collection('turnos_extras').doc(trabajadorRut).get();
+                if (!turnoExtraDoc.exists) return false;
+
+                const datosExtra = turnoExtraDoc.data();
+
+                for (const key in datosExtra) {
+                    if (datosExtra.hasOwnProperty(key)) {
+                        const registro = datosExtra[key];
+                        if ((registro.turnos_dia?.fechas?.includes(fecha)) ||
+                            (registro.turnos_noche?.fechas?.includes(fecha))) {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            } catch (error) {
+                console.error('Error verificando turno extra:', error);
+                return false;
+            }
+        }
+
+        // Generar QR para trabajador (versión compacta con nombre de empresa)
+        function generateWorkerQR(trabajadorRut) {
+            try {
+                const trabajador = cache.workers.find(w => w.rut === trabajadorRut);
+                if (!trabajador) {
+                    showMessage('Trabajador no encontrado', 'error');
+                    return;
+                }
+
+                if (!trabajador.lugares_trabajo || trabajador.lugares_trabajo.length === 0) {
+                    showMessage('El trabajador no tiene lugares de trabajo asignados', 'error');
+                    return;
+                }
+
+                // QR universal que contiene solo datos del trabajador
+                const qrData = {
+                    t: 'wa_universal', // worker_attendance universal
+                    r: trabajador.rut,
+                    n: trabajador.nombre,
+                    tu: trabajador.turno,
+                    tt: trabajador.tipo_turno,
+                    vf: new Date().toISOString().split('T')[0], // valid from
+                    vu: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // valid until
+                    sig: CryptoJS.SHA256(
+                        trabajador.rut +
+                        'UNIVERSAL_QR' +
+                        'DSGLOBAL2024'
+                    ).toString().substring(0, 16) // Firma para QR universal
+                };
+
+                // Crear QR
+                const canvas = document.createElement('canvas');
+                const qr = new QRious({
+                    element: canvas,
+                    value: JSON.stringify(qrData),
+                    size: 280,
+                    foreground: '#1e3c72',
+                    background: '#ffffff',
+                    level: 'M'
+                });
+
+                showWorkerQRViewUniversal(trabajador, canvas, qrData);
+
+            } catch (error) {
+                console.error('Error generando QR:', error);
+                showMessage('Error al generar QR: ' + error.message, 'error');
+            }
+        }
+
+        function showWorkerQRViewUniversal(trabajador, canvas, qrData) {
+            hideAllViews();
+            document.getElementById('workerQRView').classList.remove('hidden');
+
+            const display = document.getElementById('workerQRDisplay');
+
+            const turnoTexto = trabajador.turno === 'dia' ? 'Día' : 'Noche';
+            const vigenciaHasta = new Date(qrData.vu).toLocaleDateString('es-CL');
+            const empresaNombre = cache.company?.razon_social || 'DS Global';
+
+            // Mostrar lugares asignados
+            const lugaresAsignados = trabajador.lugares_trabajo.map(lugarId => {
+                const lugar = cache.workplaces.find(w => w.id === lugarId);
+                return lugar?.nombre || lugarId;
+            }).join(', ');
+
+            display.innerHTML = `
+                <h3 style="margin-bottom: 20px; color: #1e3c72;">QR Universal de Asistencia</h3>
+
+                <div class="qr-info">
+                    <strong>Trabajador:</strong> ${trabajador.nombre} ${trabajador.apellido || ''}<br>
+                    <strong>RUT:</strong> ${trabajador.rut}<br>
+                    <strong>Empresa:</strong> ${empresaNombre}<br>
+                    <strong>Lugares asignados:</strong> ${lugaresAsignados}<br>
+                    <strong>Turno:</strong> ${turnoTexto}<br>
+                    <strong>Válido hasta:</strong> ${vigenciaHasta}
+                </div>
+
+                <div style="margin: 20px 0; text-align: center; padding: 20px; background: white; border-radius: 15px;" class="qr-container">
+                    <div class="qr-overlay">${empresaNombre}</div>
+                </div>
+
+                <div class="location-info">
+                    <strong>QR Universal - Funciona en todos los lugares asignados:</strong><br>
+                    • Un solo QR para todos sus lugares de trabajo<br>
+                    • Se actualiza automáticamente cuando se asignen nuevos lugares<br>
+                    • Solo funciona si está dentro del rango permitido<br>
+                    • Contacte supervisor en caso de problemas
+                </div>
+            `;
+
+            const qrContainer = display.querySelector('.qr-container');
+            qrContainer.insertBefore(canvas, qrContainer.querySelector('.qr-overlay'));
+
+            currentWorkerQR = {
+                canvas,
+                trabajador,
+                lugarTrabajo: { nombre: 'Múltiples ubicaciones' },
+                qrData,
+                empresaNombre
+            };
+        }
+
+        function showWorkerQRView(trabajador, lugarTrabajo, canvas, qrData) {
+            hideAllViews();
+            document.getElementById('workerQRView').classList.remove('hidden');
+
+            const display = document.getElementById('workerQRDisplay');
+
+            const turnoTexto = trabajador.turno === 'dia' ? 'Día' : 'Noche';
+            const vigenciaHasta = new Date(qrData.vu).toLocaleDateString('es-CL');
+            const tipoTurnoTexto = trabajador.tipo_turno ?
+                cache.turns.find(t => t.id === trabajador.tipo_turno)?.nombre || trabajador.tipo_turno :
+                'No asignado';
+
+                // Obtener nombre de la empresa
+                const empresaNombre = cache.company?.razon_social || 'DS Global';
+
+            display.innerHTML = `
+                <h3 style="margin-bottom: 20px; color: #1e3c72;">QR Personal de Asistencia</h3>
+
+                <div class="qr-info">
+                    <strong>Trabajador:</strong> ${trabajador.nombre} ${trabajador.apellido || ''}<br>
+                    <strong>RUT:</strong> ${trabajador.rut}<br>
+                    <strong>Empresa:</strong> ${empresaNombre}<br>
+                    <strong>Lugar:</strong> ${lugarTrabajo.nombre}<br>
+                    <strong>Turno:</strong> ${turnoTexto}<br>
+                    <strong>Válido hasta:</strong> ${vigenciaHasta}
+                </div>
+
+                <div style="margin: 20px 0; text-align: center; padding: 20px; background: white; border-radius: 15px;" class="qr-container">
+                    <!-- El canvas del QR se insertará aquí -->
+                    <div class="qr-overlay">${empresaNombre}</div>
+                </div>
+
+                <div class="location-info">
+                    <strong>Instrucciones:</strong><br>
+                    • QR compacto para fácil lectura<br>
+                    • Solo funciona en ${lugarTrabajo.nombre}<br>
+                    • Respete horarios establecidos<br>
+                    • Contacte supervisor en caso de problemas
+                </div>
+            `;
+
+            const qrContainer = display.querySelector('.qr-container');
+            qrContainer.insertBefore(canvas, qrContainer.querySelector('.qr-overlay'));
+
+            currentWorkerQR = {
+                canvas,
+                trabajador,
+                lugarTrabajo,
+                qrData,
+                empresaNombre
+            };
+        }
+
+        // Función para descargar QR compacto con logo
+        async function downloadWorkerQR() {
+            if (!currentWorkerQR) {
+                showMessage('No hay QR para descargar', 'error');
+                return;
+            }
+
+            // Si hay logo, crear canvas con logo incluido
+            if (cache.logo) {
+                const logoImg = new Image();
+                logoImg.onload = function() {
+                    const finalCanvas = createCompactQRCardWithLogo(logoImg);
+                    downloadCanvas(finalCanvas);
+                };
+                logoImg.onerror = function() {
+                    // Si falla cargar el logo, crear sin logo
+                    const finalCanvas = createCompactQRCard();
+                    downloadCanvas(finalCanvas);
+                };
+                logoImg.src = cache.logo;
+            } else {
+                const finalCanvas = createCompactQRCard();
+                downloadCanvas(finalCanvas);
+            }
+        }
+
+        function createCompactQRCardWithLogo(logoImg) {
+            const finalCanvas = document.createElement('canvas');
+            const ctx = finalCanvas.getContext('2d');
+
+            finalCanvas.width = 400;
+            finalCanvas.height = 480;
+
+            // Fondo blanco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+            let currentY = 30;
+            const centerX = finalCanvas.width / 2;
+            const empresaNombre = cache.company?.razon_social || currentWorkerQR.empresaNombre || 'DS Global';
+
+            // Dibujar logo circular centrado
+            const logoSize = 60;
+            const logoX = centerX - logoSize/2;
+            const logoY = currentY;
+
+            // Crear máscara circular para el logo
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, currentY + logoSize/2, logoSize/2, 0, 2 * Math.PI);
+            ctx.clip();
+            ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+            ctx.restore();
+
+            // Agregar borde circular al logo
+            ctx.beginPath();
+            ctx.arc(centerX, currentY + logoSize/2, logoSize/2, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            currentY += logoSize + 25;
+
+            // Header con nombre de empresa
+            ctx.fillStyle = '#1e3c72';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(empresaNombre.toUpperCase(), centerX, currentY);
+            currentY += 20;
+
+            // Línea separadora
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, currentY);
+            ctx.lineTo(350, currentY);
+            ctx.stroke();
+            currentY += 25;
+
+            // Información del trabajador - CENTRADA
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#1e3c72';
+            ctx.textAlign = 'center';
+
+            const nombreCompleto = `${currentWorkerQR.trabajador.nombre} ${currentWorkerQR.trabajador.apellido || ''}`;
+            ctx.fillText(nombreCompleto, centerX, currentY);
+            currentY += 15;
+
+            // QR Code centrado
+            const qrSize = 200;
+            const qrX = (finalCanvas.width - qrSize) / 2;
+            ctx.drawImage(currentWorkerQR.canvas, qrX, currentY, qrSize, qrSize);
+
+            // Overlay con nombre de empresa en el centro del QR
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            const overlayWidth = 120;
+            const overlayHeight = 24;
+            ctx.fillRect(qrX + qrSize/2 - overlayWidth/2, currentY + qrSize/2 - overlayHeight/2, overlayWidth, overlayHeight);
+
+            ctx.strokeStyle = '#1e3c72';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(qrX + qrSize/2 - overlayWidth/2, currentY + qrSize/2 - overlayHeight/2, overlayWidth, overlayHeight);
+
+            ctx.fillStyle = '#1e3c72';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(empresaNombre, qrX + qrSize/2, currentY + qrSize/2 + 4);
+
+            currentY += qrSize + 15;
+
+            // Instrucciones centradas
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#666666';
+            ctx.textAlign = 'center';
+
+            const instrucciones = [
+                'Escanee para marcar asistencia',
+                `Válido hasta: ${new Date(currentWorkerQR.qrData.vu).toLocaleDateString('es-CL')}`,
+                'Solo funciona en lugar asignado'
+            ];
+
+            instrucciones.forEach(instruccion => {
+                ctx.fillText(instruccion, centerX, currentY);
+                currentY += 16;
+            });
+
+            // Footer
+            currentY = finalCanvas.height - 15;
+            ctx.font = '10px Arial';
+            ctx.fillStyle = '#999999';
+            ctx.fillText('Sistema de Asistencia QR', centerX, currentY);
+
+            return finalCanvas;
+        }
+
+        function downloadCanvas(canvas) {
+            const link = document.createElement('a');
+            link.download = `QR_${currentWorkerQR.trabajador.nombre.replace(/ /g, '_')}_${currentWorkerQR.trabajador.rut}.png`;
+            link.href = canvas.toDataURL('image/png');
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showMessage('QR descargado exitosamente', 'success');
+        }
+
+        // Función para compartir QR
+        async function shareWorkerQR() {
+            if (!currentWorkerQR) {
+                showMessage('No hay QR para compartir', 'error');
+                return;
+            }
+
+            try {
+                let finalCanvas;
+
+                // Crear canvas con o sin logo
+                if (cache.logo) {
+                    const logoImg = new Image();
+                    await new Promise((resolve, reject) => {
+                        logoImg.onload = () => {
+                            finalCanvas = createCompactQRCardWithLogo(logoImg);
+                            resolve();
+                        };
+                        logoImg.onerror = () => {
+                            finalCanvas = createCompactQRCard();
+                            resolve();
+                        };
+                        logoImg.src = cache.logo;
+                    });
+                } else {
+                    finalCanvas = createCompactQRCard();
+                }
+
+                if (navigator.share) {
+                    finalCanvas.toBlob(blob => {
+                        const file = new File([blob], `QR_${currentWorkerQR.trabajador.nombre}_${currentWorkerQR.trabajador.rut}.png`, {
+                            type: 'image/png'
+                        });
+
+                        navigator.share({
+                            title: `QR de Asistencia - ${currentWorkerQR.trabajador.nombre}`,
+                            text: `QR personal para marcar asistencia de ${currentWorkerQR.trabajador.nombre} en ${currentWorkerQR.lugarTrabajo.nombre}`,
+                            files: [file]
+                        }).then(() => {
+                            showMessage('QR compartido exitosamente', 'success');
+                        }).catch(error => {
+                            console.error('Error sharing:', error);
+                            fallbackShare(finalCanvas);
+                        });
+                    });
+                } else {
+                    fallbackShare(finalCanvas);
+                }
+            } catch (error) {
+                console.error('Error en shareWorkerQR:', error);
+                showMessage('Error al compartir QR', 'error');
+            }
+        }
+
+        // Crear tarjeta QR compacta con logo y diseño centrado
+        function createCompactQRCard() {
+            const finalCanvas = document.createElement('canvas');
+            const ctx = finalCanvas.getContext('2d');
+
+            // Tamaño optimizado para impresión
+            finalCanvas.width = 370;
+            finalCanvas.height = 550;
+
+            // Fondo blanco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+            let currentY = 30;
+            const centerX = finalCanvas.width / 2;
+            const empresaNombre = cache.company?.razon_social || currentWorkerQR.empresaNombre || 'DS Global';
+
+            // Logo de la empresa (si existe)
+            if (cache.logo) {
+                try {
+                    const logoImg = new Image();
+                    logoImg.onload = function() {
+                        // Dibujar logo centrado
+                        const logoSize = 60;
+                        ctx.drawImage(logoImg, centerX - logoSize/2, currentY, logoSize, logoSize);
+                        continueDrawing();
+                    };
+                    logoImg.src = cache.logo;
+                    return new Promise(resolve => {
+                        logoImg.onload = () => {
+                            const logoSize = 60;
+                            ctx.drawImage(logoImg, centerX - logoSize/2, currentY, logoSize, logoSize);
+                            currentY += logoSize + 15;
+                            finishCard();
+                            resolve(finalCanvas);
+                        };
+                    });
+                } catch (error) {
+                    console.log('Error cargando logo:', error);
+                    finishCard();
+                }
+            } else {
+                finishCard();
+            }
+
+            function finishCard() {
+                // Header con nombre de empresa
+                ctx.fillStyle = '#1e3c72';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+
+                ctx.fillText(empresaNombre.toUpperCase(), centerX, currentY);
+                currentY += 20;
+
+                // Línea separadora
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(50, currentY);
+                ctx.lineTo(350, currentY);
+                ctx.stroke();
+                currentY += 25;
+
+                // Información del trabajador - CENTRADA
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = '#1e3c72';
+                ctx.textAlign = 'center';
+
+                const nombreCompleto = `${currentWorkerQR.trabajador.nombre} ${currentWorkerQR.trabajador.apellido || ''}`;
+                ctx.fillText(nombreCompleto, centerX, currentY);
+                currentY += 15;
+
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#333333';
+
+                // QR Code centrado
+                const qrSize = 200;
+                const qrX = (finalCanvas.width - qrSize) / 2;
+                ctx.drawImage(currentWorkerQR.canvas, qrX, currentY, qrSize, qrSize);
+
+                // Overlay con nombre de empresa en el centro del QR
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                const overlayWidth = ctx.measureText(empresaNombre).width + 20;
+                const overlayHeight = 24;
+                ctx.fillRect(qrX + qrSize/2 - overlayWidth/2, currentY + qrSize/2 - overlayHeight/2, overlayWidth, overlayHeight);
+
+                ctx.strokeStyle = '#1e3c72';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(qrX + qrSize/2 - overlayWidth/2, currentY + qrSize/2 - overlayHeight/2, overlayWidth, overlayHeight);
+
+                ctx.fillStyle = '#1e3c72';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(empresaNombre, qrX + qrSize/2, currentY + qrSize/2 + 4);
+
+                currentY += qrSize + 15;
+
+                // Instrucciones centradas
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#666666';
+                ctx.textAlign = 'center';
+
+                const instrucciones = [
+                    'Escanee para marcar asistencia',
+                    `Válido hasta: ${new Date(currentWorkerQR.qrData.vu).toLocaleDateString('es-CL')}`,
+                    'Solo funciona en lugar asignado'
+                ];
+
+                instrucciones.forEach(instruccion => {
+                    ctx.fillText(instruccion, centerX, currentY);
+                    currentY += 16;
+                });
+
+                // Footer
+                currentY = finalCanvas.height - 15;
+                ctx.font = '10px Arial';
+                ctx.fillStyle = '#999999';
+                ctx.fillText('Sistema de Asistencia QR', centerX, currentY);
+            }
+
+            return finalCanvas;
+        }
+
+        function fallbackShare(canvas) {
+            if (navigator.clipboard) {
+                canvas.toBlob(async blob => {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                        ]);
+                        showMessage('QR copiado al portapapeles', 'success');
+                    } catch (error) {
+                        console.error('Error copying to clipboard:', error);
+                        showMessage('No se pudo copiar. Use la opción de descarga.', 'warning');
+                    }
+                });
+            } else {
+                showMessage('Use la opción de descarga para obtener el QR', 'warning');
+            }
+        }
+
+        // Gestión de ubicación
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocalización no disponible'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        resolve({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        });
+                    },
+                    error => {
+                        let errorMsg = 'Error de ubicación';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMsg = 'Permiso de ubicación denegado';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMsg = 'Ubicación no disponible';
+                                break;
+                            case error.TIMEOUT:
+                                errorMsg = 'Tiempo de espera agotado';
+                                break;
+                        }
+                        reject(new Error(errorMsg));
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 60000
+                    }
+                );
+            });
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        // Escáner de QR
+        async function toggleCamera() {
+            const video = document.getElementById('scanner');
+            const btn = document.getElementById('cameraBtn');
+
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                isScanning = false;
+                btn.textContent = 'Activar Cámara';
+                video.srcObject = null;
+                return;
+            }
+
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 640, min: 320 },
+                        height: { ideal: 480, min: 240 }
+                    }
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+                isScanning = true;
+                btn.textContent = 'Detener Cámara';
+
+                video.onloadedmetadata = () => {
+                    video.play().then(() => {
+                        console.log('Cámara iniciada correctamente');
+                        scanQR();
+                    }).catch(err => {
+                        console.error('Error al reproducir video:', err);
+                        showMessage('Error al iniciar la cámara', 'error');
+                    });
+                };
+
+            } catch (error) {
+                console.error('Error de cámara:', error);
+                showMessage('Error al acceder a la cámara: ' + error.message, 'error');
+                isScanning = false;
+            }
+        }
+
+        function scanQR() {
+            if (!isScanning || !currentStream) return;
+
+            const video = document.getElementById('scanner');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                try {
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code && code.data) {
+                        console.log('QR detectado:', code.data);
+                        processQRCode(code.data);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error al escanear:', error);
+                }
+            }
+
+            requestAnimationFrame(scanQR);
+        }
+
+        async function processQRCode(data) {
+            try {
+                isScanning = false;
+
+                let qrData;
+                try {
+                    qrData = JSON.parse(data);
+                } catch {
+                    showMessage('QR no válido', 'error');
+                    setTimeout(() => { if (currentStream) { isScanning = true; scanQR(); } }, 3000);
+                    return;
+                }
+
+                // Manejar QR universal y formato anterior
+                if (qrData.t === 'wa_universal') {
+                    await processUniversalWorkerAttendance(qrData);
+                } else if (qrData.t === 'wa' || qrData.type === 'worker_attendance') {
+                    await processWorkerAttendance(qrData);
+                } else {
+                    showMessage('Tipo de QR no reconocido', 'error');
+                }
+
+                setTimeout(() => {
+                    if (currentStream) {
+                        isScanning = true;
+                        scanQR();
+                    }
+                }, 3000);
+
+            } catch (error) {
+                showMessage('Error al procesar QR: ' + error.message, 'error');
+                setTimeout(() => { if (currentStream) { isScanning = true; scanQR(); } }, 3000);
+            }
+        }
+
+        async function processUniversalWorkerAttendance(qrData) {
+            try {
+                const workerRut = qrData.r;
+                const workerName = qrData.n;
+                const signature = qrData.sig;
+                const validUntil = qrData.vu;
+
+                // Verificar trabajador en cache
+                const worker = cache.workers.find(w => w.rut === workerRut && !w.eliminado);
+                if (!worker) {
+                    showMessage(`Trabajador no encontrado: ${workerRut}`, 'error');
+                    return;
+                }
+
+                // Verificar QR válido
+                if (new Date(validUntil) < new Date()) {
+                    showMessage('QR vencido. Solicite uno nuevo al administrador', 'error');
+                    return;
+                }
+
+                // Verificar firma
+                const expectedSignature = CryptoJS.SHA256(
+                    workerRut + 'UNIVERSAL_QR' + 'DSGLOBAL2024'
+                ).toString().substring(0, 16);
+
+                if (signature !== expectedSignature) {
+                    showMessage('QR no válido o adulterado', 'error');
+                    return;
+                }
+
+                // Verificar si es día de trabajo o tiene turno extra
+                const fechaActual = new Date().toISOString().split('T')[0];
+                const esDiaTrabajoActual = await esDiaTrabajo(workerRut, fechaActual);
+                const tieneTurnoExtra = await tieneTurnoExtraAsignado(workerRut, fechaActual);
+
+                if (!esDiaTrabajoActual && !tieneTurnoExtra) {
+                    showMessage('No puede marcar asistencia: Día de descanso según su ciclo de turnos', 'error');
+                    return;
+                }
+
+                // Obtener ubicación actual
+                let currentLoc = null;
+                try {
+                    showMessage('Verificando ubicación...', 'warning');
+                    currentLoc = await getCurrentLocation();
+                } catch (error) {
+                    showMessage('Error de ubicación: ' + error.message, 'warning');
+                    return;
+                }
+
+                // Verificar en qué lugar de trabajo está
+                let workplaceMatch = null;
+                let minDistance = Infinity;
+
+                for (const lugarId of worker.lugares_trabajo) {
+                    const lugar = cache.workplaces.find(w => w.id === lugarId);
+                    if (lugar && lugar.ubicacion && lugar.ubicacion.latitud) {
+                        const distance = calculateDistance(
+                            currentLoc.lat, currentLoc.lng,
+                            lugar.ubicacion.latitud, lugar.ubicacion.longitud
+                        );
+
+                        const tolerance = lugar.tolerancia || 15;
+                        if (distance <= tolerance && distance < minDistance) {
+                            minDistance = distance;
+                            workplaceMatch = lugar;
+                        }
+                    }
+                }
+
+                if (!workplaceMatch) {
+                    const lugaresNombres = worker.lugares_trabajo.map(lugarId => {
+                        const lugar = cache.workplaces.find(w => w.id === lugarId);
+                        return lugar?.nombre || lugarId;
+                    }).join(', ');
+
+                    showMessage(`Debe estar en uno de sus lugares asignados: ${lugaresNombres}`, 'error');
+                    return;
+                }
+
+                // Verificar marcaciones del día
+                const now = new Date();
+                const fechaStr = now.toISOString().split('T')[0];
+
+                const recordsToday = cache.pendingRecords
+                    .filter(r => r.rut === workerRut && r.fecha === fechaStr)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                let type = 'entrada';
+                if (recordsToday.length > 0) {
+                    const lastRecord = recordsToday[0];
+                    const timeSinceLastRecord = now - new Date(lastRecord.timestamp);
+                    const minutesSinceLastRecord = timeSinceLastRecord / (1000 * 60);
+
+                    if (minutesSinceLastRecord < 30) {
+                        showMessage('Ya marcó hace poco. Espere al menos 30 minutos.', 'warning');
+                        return;
+                    }
+
+                    const hasEntryToday = recordsToday.some(r => r.hora_entrada);
+                    const hasExitToday = recordsToday.some(r => r.hora_salida);
+
+                    if (hasEntryToday && !hasExitToday) {
+                        type = 'salida';
+                    } else {
+                        type = 'entrada';
+                    }
+                }
+
+                // Crear registro
+                const record = {
+                    rut: workerRut,
+                    trabajador_id: workerRut,
+                    nombre_trabajador: worker.nombre,
+                    fecha: fechaStr,
+                    hora_entrada: type === 'entrada' ? now.toISOString() : null,
+                    hora_salida: type === 'salida' ? now.toISOString() : null,
+                    lugar_trabajo: workplaceMatch.nombre,
+                    estado: type === 'entrada' ? 'en_curso' : 'completado',
+                    asistencia: true,
+                    tipo_turno: 'normal',
+                    tipo_turno_marcado: worker.turno,
+                    marcacion_emergencia: {
+                        autorizado: 'admin',
+                        descripcion_emergencia: 'Entrada mediante QR universal'
+                    },
+                    ubicacion_entrada: type === 'entrada' && currentLoc ? {
+                        latitud: currentLoc.lat,
+                        longitud: currentLoc.lng
+                    } : null,
+                    ubicacion_salida: type === 'salida' && currentLoc ? {
+                        latitud: currentLoc.lat,
+                        longitud: currentLoc.lng
+                    } : null,
+                    timestamp: now,
+                    date_created: {
+                        timestamp: now,
+                        client_time: now.toLocaleString('es-CL', { timeZone: 'America/Santiago' }),
+                        fecha_manual: fechaStr
+                    }
+                };
+
+                // Guardar en cache
+                cache.pendingRecords.push(record);
+                saveToCache('pendingRecords', cache.pendingRecords);
+
+                // Sincronizar con Firebase
+                let syncSuccess = false;
+                if (firebaseReady && navigator.onLine) {
+                    try {
+                        const docId = `${record.rut}_${record.fecha}_${now.getTime()}`;
+                        await db.collection('asistencias').doc(docId).set(record);
+
+                        cache.pendingRecords.pop();
+                        saveToCache('pendingRecords', cache.pendingRecords);
+                        syncSuccess = true;
+                    } catch (error) {
+                        console.log('Error syncing attendance:', error);
+                    }
+                }
+
+                // Mostrar mensaje
+                const typeEmoji = type === 'entrada' ? '🚪➡️' : '🚪⬅️';
+                const syncBadge = syncSuccess ? '✅' : '🔄';
+                const distanceText = ` (${Math.round(minDistance)}m)`;
+
+                showMessage(
+                    `${typeEmoji} ${type.toUpperCase()}: ${worker.nombre} en ${workplaceMatch.nombre}${distanceText} ${syncBadge}`,
+                    'success'
+                );
+
+                updateCacheStatus();
+
+                // Enviar notificación
+                enviarNotificacionLocal(record);
+
+            } catch (error) {
+                console.error('Error procesando asistencia universal:', error);
+                showMessage('Error interno al procesar asistencia: ' + error.message, 'error');
+            }
+        }
+
+        async function processWorkerAttendance(qrData) {
+            try {
+                // Normalizar datos según formato (compacto vs completo)
+                const workerRut = qrData.r || qrData.workerRut;
+                const workerName = qrData.n || qrData.workerName;
+                const workplaceId = qrData.w || qrData.workplaceId;
+                const workplaceName = qrData.wn || qrData.workplaceName;
+                const workplaceLocation = qrData.l ?
+                    { lat: qrData.l.a, lng: qrData.l.o } :
+                    qrData.workplaceLocation;
+                const tolerance = qrData.tol || qrData.tolerance || 15;
+                const signature = qrData.sig || qrData.signature;
+                const validUntil = qrData.vu || qrData.validUntil;
+
+                // Verificar trabajador en cache
+                const worker = cache.workers.find(w => w.rut === workerRut && !w.eliminado);
+                if (!worker) {
+                    showMessage(`Trabajador no encontrado: ${workerRut}`, 'error');
+                    return;
+                }
+
+                // Verificar si es día de trabajo o tiene turno extra
+                const fechaActual = new Date().toISOString().split('T')[0];
+                const esDiaTrabajoActual = await esDiaTrabajo(workerRut, fechaActual);
+                const tieneTurnoExtra = await tieneTurnoExtraAsignado(workerRut, fechaActual);
+
+                if (!esDiaTrabajoActual && !tieneTurnoExtra) {
+                    showMessage('No puede marcar asistencia: Día de descanso según su ciclo de turnos', 'error');
+                    return;
+                }
+
+                // Verificar QR válido
+                if (new Date(validUntil) < new Date()) {
+                    showMessage('QR vencido. Solicite uno nuevo al administrador', 'error');
+                    return;
+                }
+
+                // Verificar firma (adaptada para formato compacto)
+                const expectedSignature = CryptoJS.SHA256(
+                    workerRut +
+                    workplaceId +
+                    workplaceLocation.lat +
+                    workplaceLocation.lng +
+                    'DSGLOBAL2024'
+                ).toString();
+
+                // Para QR compacto, verificar solo los primeros 16 caracteres
+                const signatureToCheck = signature.length === 16 ?
+                    expectedSignature.substring(0, 16) :
+                    expectedSignature;
+
+                if (signature !== signatureToCheck) {
+                    showMessage('QR no válido o adulterado', 'error');
+                    return;
+                }
+
+                // Verificar ubicación
+                let currentLoc = null;
+                let distance = 0;
+
+                try {
+                    showMessage('Verificando ubicación...', 'warning');
+                    currentLoc = await getCurrentLocation();
+                    distance = calculateDistance(
+                        currentLoc.lat, currentLoc.lng,
+                        workplaceLocation.lat, workplaceLocation.lng
+                    );
+
+                    if (distance > tolerance) {
+                        showMessage(`Debe estar en ${workplaceName} para marcar asistencia (${Math.round(distance)}m de distancia)`, 'error');
+                        return;
+                    }
+                } catch (error) {
+                    showMessage('Error de ubicación: ' + error.message, 'warning');
+                    // Continuar sin ubicación en caso de error
+                }
+
+                // Verificar marcaciones del día
+                const now = new Date();
+                const fechaStr = now.toISOString().split('T')[0];
+
+                const recordsToday = cache.pendingRecords
+                    .filter(r => r.rut === workerRut && r.fecha === fechaStr)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                let type = 'entrada';
+                if (recordsToday.length > 0) {
+                    const lastRecord = recordsToday[0];
+                    const timeSinceLastRecord = now - new Date(lastRecord.timestamp);
+                    const minutesSinceLastRecord = timeSinceLastRecord / (1000 * 60);
+
+                    if (minutesSinceLastRecord < 30) {
+                        showMessage('Ya marcó hace poco. Espere al menos 30 minutos.', 'warning');
+                        return;
+                    }
+
+                    // Determinar si es entrada o salida
+                    const hasEntryToday = recordsToday.some(r => r.hora_entrada);
+                    const hasExitToday = recordsToday.some(r => r.hora_salida);
+
+                    if (hasEntryToday && !hasExitToday) {
+                        type = 'salida';
+                    } else {
+                        type = 'entrada';
+                    }
+                }
+
+                // Crear registro
+                const record = {
+                    rut: workerRut,
+                    trabajador_id: workerRut,
+                    nombre_trabajador: worker.nombre,
+                    fecha: fechaStr,
+                    hora_entrada: type === 'entrada' ? now.toISOString() : null,
+                    hora_salida: type === 'salida' ? now.toISOString() : null,
+                    lugar_trabajo: workplaceName,
+                    estado: type === 'entrada' ? 'en_curso' : 'completado',
+                    asistencia: true,
+                    tipo_turno: 'normal',
+                    tipo_turno_marcado: worker.turno,
+                    marcacion_emergencia: {
+                        autorizado: 'admin',
+                        descripcion_emergencia: 'Entrada mediante QR personal'
+                    },
+                    ubicacion_entrada: type === 'entrada' && currentLoc ? {
+                        latitud: currentLoc.lat,
+                        longitud: currentLoc.lng
+                    } : null,
+                    ubicacion_salida: type === 'salida' && currentLoc ? {
+                        latitud: currentLoc.lat,
+                        longitud: currentLoc.lng
+                    } : null,
+                    timestamp: now,
+                    date_created: {
+                        timestamp: now,
+                        client_time: now.toLocaleString('es-CL', { timeZone: 'America/Santiago' }),
+                        fecha_manual: fechaStr
+                    }
+                };
+
+                // Guardar en cache
+                cache.pendingRecords.push(record);
+                saveToCache('pendingRecords', cache.pendingRecords);
+
+                // Sincronizar con Firebase
+                let syncSuccess = false;
+                if (firebaseReady && navigator.onLine) {
+                    try {
+                        const docId = `${record.rut}_${record.fecha}_${now.getTime()}`;
+                        await db.collection('asistencias').doc(docId).set(record);
+
+                        // Remover del cache si se sincronizó correctamente
+                        cache.pendingRecords.pop();
+                        saveToCache('pendingRecords', cache.pendingRecords);
+                        syncSuccess = true;
+                    } catch (error) {
+                        console.log('Error syncing attendance:', error);
+                    }
+                }
+
+                // Mostrar mensaje
+                const typeEmoji = type === 'entrada' ? '🚪➡️' : '🚪⬅️';
+                const syncBadge = syncSuccess ? '✅' : '🔄';
+                const distanceText = distance > 0 ? ` (${Math.round(distance)}m)` : '';
+
+                showMessage(
+                    `${typeEmoji} ${type.toUpperCase()}: ${worker.nombre}${distanceText} ${syncBadge}`,
+                    'success'
+                );
+
+                updateCacheStatus();
+
+                // Enviar notificación
+                enviarNotificacionLocal(record);
+
+            } catch (error) {
+                console.error('Error procesando asistencia:', error);
+                showMessage('Error interno al procesar asistencia: ' + error.message, 'error');
+            }
+        }
+
+        // Cargar registros de asistencia
+        async function loadAttendanceRecords() {
+            const listDiv = document.getElementById('attendanceList');
+            listDiv.innerHTML = '<p style="text-align: center;">Cargando registros...</p>';
+
+            let records = [];
+
+            // Cargar registros pendientes
+            records.push(...cache.pendingRecords.map(r => ({
+                ...r,
+                isPending: true,
+                timestamp: new Date(r.timestamp)
+            })));
+
+            // Cargar desde Firebase si hay conexión
+            if (firebaseReady && navigator.onLine) {
+                try {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                    const snapshot = await db.collection('asistencias')
+                        .where('timestamp', '>=', sevenDaysAgo)
+                        .orderBy('timestamp', 'desc')
+                        .limit(100)
+                        .get();
+
+                    const firebaseRecords = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        timestamp: doc.data().timestamp?.toDate() || new Date(doc.data().date_created?.timestamp?.seconds * 1000),
+                        isPending: false
+                    }));
+
+                    records.push(...firebaseRecords);
+                } catch (error) {
+                    console.log('Error loading records:', error);
+                }
+            }
+
+            // Eliminar duplicados y ordenar
+            const uniqueRecords = [];
+            const seen = new Set();
+
+            records.forEach(record => {
+                const key = `${record.rut}_${record.timestamp.getTime()}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueRecords.push(record);
+                }
+            });
+
+            uniqueRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+            if (uniqueRecords.length === 0) {
+                listDiv.innerHTML = '<p style="text-align: center; color: #7f8c8d;">No hay registros para mostrar</p>';
+                return;
+            }
+
+            listDiv.innerHTML = '';
+
+            // Agrupar por fecha
+            const recordsByDate = {};
+            uniqueRecords.forEach(record => {
+                const dateKey = record.timestamp.toDateString();
+                if (!recordsByDate[dateKey]) {
+                    recordsByDate[dateKey] = [];
+                }
+                recordsByDate[dateKey].push(record);
+            });
+
+            Object.keys(recordsByDate).forEach(dateKey => {
+                // Encabezado de fecha
+                const dateHeader = document.createElement('div');
+                dateHeader.style.cssText = `
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    color: white;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    margin: 15px 0 10px 0;
+                    font-weight: 600;
+                    text-align: center;
+                `;
+                dateHeader.textContent = new Date(dateKey).toLocaleDateString('es-CL', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                listDiv.appendChild(dateHeader);
+
+                // Registros de esa fecha
+                recordsByDate[dateKey].forEach(record => {
+                    const recordDiv = document.createElement('div');
+                    recordDiv.className = 'attendance-record';
+
+                    const statusColor = record.isPending ? '#f39c12' : '#27ae60';
+                    recordDiv.style.borderLeftColor = statusColor;
+
+                    const typeEmoji = record.hora_entrada && !record.hora_salida ? '🚪➡️' :
+                                     record.hora_salida ? '🚪⬅️' : '🕐';
+                    const pendingBadge = record.isPending ? ' 🔄' : '';
+
+                    const hora = record.hora_entrada || record.hora_salida;
+                    const horaFormateada = hora ?
+                        new Date(hora).toLocaleTimeString('es-CL', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }) :
+                        record.timestamp.toLocaleTimeString('es-CL', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                    const tipoMarcacion = record.hora_entrada && !record.hora_salida ? 'ENTRADA' :
+                                         record.hora_salida ? 'SALIDA' : 'MARCACIÓN';
+
+                    recordDiv.innerHTML = `
+                        <div>
+                            <strong>${record.nombre_trabajador}${pendingBadge}</strong><br>
+                            <small>${typeEmoji} ${tipoMarcacion}</small>
+                            ${record.lugar_trabajo ? `<br><small>📍 ${record.lugar_trabajo}</small>` : ''}
+                            ${record.tipo_turno_marcado ? `<br><small>🕐 Turno ${record.tipo_turno_marcado}</small>` : ''}
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 16px; font-weight: 600;">${horaFormateada}</div>
+                            <small style="color: #7f8c8d;">${record.isPending ? 'Pendiente' : 'Sincronizado'}</small>
+                        </div>
+                    `;
+                    listDiv.appendChild(recordDiv);
+                });
+            });
+        }
+
+        // Función para mostrar reportes
+        async function generateReport() {
+            const period = document.getElementById('reportPeriod').value;
+            const resultsDiv = document.getElementById('reportResults');
+
+            resultsDiv.innerHTML = '<p style="text-align: center;">Generando reporte...</p>';
+
+            // Determinar fechas
+            let startDate, endDate;
+            const today = new Date();
+
+            switch(period) {
+                case 'today':
+                    startDate = new Date(today);
+                    endDate = new Date(today);
+                    break;
+                case 'week':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 7);
+                    endDate = new Date(today);
+                    break;
+                case 'month':
+                    startDate = new Date(today);
+                    startDate.setDate(1);
+                    endDate = new Date(today);
+                    break;
+                case 'custom':
+                    startDate = new Date(document.getElementById('startDate').value);
+                    endDate = new Date(document.getElementById('endDate').value);
+                    break;
+            }
+
+            // Recopilar datos
+            let allRecords = [...cache.pendingRecords];
+
+            if (firebaseReady && navigator.onLine) {
+                try {
+                    const snapshot = await db.collection('asistencias')
+                        .where('timestamp', '>=', startDate)
+                        .where('timestamp', '<=', endDate)
+                        .get();
+
+                    const firebaseRecords = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        timestamp: doc.data().timestamp?.toDate() || new Date()
+                    }));
+
+                    allRecords.push(...firebaseRecords);
+                } catch (error) {
+                    console.log('Error cargando datos para reporte:', error);
+                }
+            }
+
+            // Procesar estadísticas
+            const stats = {
+                totalRegistros: allRecords.length,
+                trabajadoresActivos: new Set(allRecords.map(r => r.rut)).size,
+                registrosPorDia: {},
+                trabajadoresPorLugar: {}
+            };
+
+            allRecords.forEach(record => {
+                const fecha = record.fecha || record.timestamp.toISOString().split('T')[0];
+                stats.registrosPorDia[fecha] = (stats.registrosPorDia[fecha] || 0) + 1;
+
+                if (record.lugar_trabajo) {
+                    stats.trabajadoresPorLugar[record.lugar_trabajo] = (stats.trabajadoresPorLugar[record.lugar_trabajo] || 0) + 1;
+                }
+            });
+
+            // Mostrar reporte
+            resultsDiv.innerHTML = `
+                <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 15px 0;">Resumen del Periodo</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">${stats.totalRegistros}</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Total Registros</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">${stats.trabajadoresActivos}</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Trabajadores Activos</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.9); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <h4 style="color: #1e3c72; margin-bottom: 10px;">Registros por Día</h4>
+                    ${Object.entries(stats.registrosPorDia).map(([fecha, count]) => `
+                        <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #ecf0f1;">
+                            <span>${new Date(fecha).toLocaleDateString('es-CL')}</span>
+                            <strong>${count}</strong>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <button class="btn btn-secondary" onclick="exportReportCSV()">
+                    Exportar CSV
+                </button>
+            `;
+
+            // Guardar datos del reporte para exportar
+            window.currentReportData = allRecords;
+        }
+
+        // Exportar registros de asistencia
+        function exportAttendance() {
+            if (cache.pendingRecords.length === 0) {
+                showMessage('No hay registros para exportar', 'warning');
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "RUT,Nombre,Fecha,Hora_Entrada,Hora_Salida,Lugar,Turno,Estado\n";
+
+            cache.pendingRecords.forEach(record => {
+                const row = [
+                    record.rut,
+                    record.nombre_trabajador,
+                    record.fecha,
+                    record.hora_entrada ? new Date(record.hora_entrada).toLocaleTimeString('es-CL') : '',
+                    record.hora_salida ? new Date(record.hora_salida).toLocaleTimeString('es-CL') : '',
+                    record.lugar_trabajo || '',
+                    record.tipo_turno_marcado || '',
+                    record.estado || ''
+                ].map(field => `"${field}"`).join(',');
+
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `asistencia_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showMessage('Registros exportados exitosamente', 'success');
+        }
+
+        function exportReportCSV() {
+            const records = window.currentReportData || [];
+            if (records.length === 0) {
+                showMessage('No hay datos para exportar', 'warning');
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Fecha,RUT,Nombre,Lugar,Hora_Entrada,Hora_Salida,Turno,Estado\n";
+
+            records.forEach(record => {
+                const worker = cache.workers.find(w => w.rut === record.rut);
+                const row = [
+                    record.fecha || record.timestamp.toISOString().split('T')[0],
+                    record.rut,
+                    worker?.nombre || 'Desconocido',
+                    record.lugar_trabajo || '',
+                    record.hora_entrada ? new Date(record.hora_entrada).toLocaleTimeString('es-CL') : '',
+                    record.hora_salida ? new Date(record.hora_salida).toLocaleTimeString('es-CL') : '',
+                    record.tipo_turno_marcado || '',
+                    record.estado || ''
+                ].map(field => `"${field}"`).join(',');
+
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `reporte_asistencia_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showMessage('Reporte exportado exitosamente', 'success');
+        }
+
+        // Limpiar registros antiguos
+        function cleanOldRecords() {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const initialCount = cache.pendingRecords.length;
+            cache.pendingRecords = cache.pendingRecords.filter(record =>
+                new Date(record.timestamp) > thirtyDaysAgo
+            );
+
+            const removedCount = initialCount - cache.pendingRecords.length;
+            saveToCache('pendingRecords', cache.pendingRecords);
+
+            if (removedCount > 0) {
+                showMessage(`Se eliminaron ${removedCount} registros antiguos`, 'success');
+                loadAttendanceRecords(); // Recargar la lista
+            } else {
+                showMessage('No hay registros antiguos para eliminar', 'warning');
+            }
+        }
+
+        // Para crear un administrador inicial usando Firebase Console o esta función temporal
+        async function createInitialAdmin() {
+            const adminData = {
+                rut: 'ADMIN-001',
+                nombre: 'Administrador',
+                apellido: 'Principal',
+                telefono: '+56912345678', // Cambiar por tu número
+                tipo_trabajador: 'administrador',
+                usuario: 'admin',
+                password: 'admin123',
+                turno: 'dia',
+                eliminado: false,
+                fecha_ingreso: new Date(),
+                lugares_trabajo: []
+            };
+
+            try {
+                await db.collection('trabajadores').doc('ADMIN-001').set(adminData);
+                console.log('Admin inicial creado - Usuario: admin, Password: admin123');
+                showMessage('Admin inicial creado exitosamente', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Error al crear admin inicial', 'error');
+            }
+        }
+
+        // Ejecutar solo una vez para crear admin inicial:
+        // Descomenta la siguiente línea, recarga la página, y luego comenta de nuevo
+        // createInitialAdmin();
+
+        // Inicialización
+        function initApp() {
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            updateCacheStatus();
+
+            // Event listeners para conexión
+            window.addEventListener('online', () => {
+                updateCacheStatus();
+                if (firebaseReady) {
+                    syncPendingRecords();
+                    syncAllData();
+                }
+            });
+            window.addEventListener('offline', updateCacheStatus);
+
+            // Sincronización periódica cada 5 minutos
+            setInterval(() => {
+                if (firebaseReady && navigator.onLine) {
+                    syncPendingRecords();
+                }
+            }, 300000);
+
+            // Obtener ubicación inicial
+            getCurrentLocation()
+                .then(location => {
+                    currentLocation = location;
+                    console.log('Ubicación inicial obtenida');
+                })
+                .catch(error => {
+                    console.log('Error obteniendo ubicación inicial:', error.message);
+                });
+
+            // Cargar datos del cache al inicio
+            if (cache.workers.length === 0 && navigator.onLine) {
+                syncAllData();
+            }
+
+            // Cargar datos de empresa al inicio
+            if (cache.company) {
+                updateCompanyDisplay(cache.company);
+            }
+            if (cache.logo) {
+                updateCompanyLogo(cache.logo);
+            }
+
+            solicitarPermisosNotificacion();
+            console.log('Sistema de Asistencia DS Global iniciado');
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+
+            // Asegurar que el botón funcione
+          const loginBtn = document.querySelector('#loginView .btn-primary');
+          if (loginBtn) {
+              loginBtn.addEventListener('click', function(e) {
+                  e.preventDefault();
+
+                  adminLogin();
+              });
+          }
+      });
+
+      // Manejar tecla Enter
+      document.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+              e.preventDefault();
+              const activeView = document.querySelector('.card:not(.hidden)');
+              if (!activeView) return;
+
+              if (activeView.id === 'loginView') {
+                  adminLogin();
+              }
+          }
+      });
+
+        // Service Worker para funcionamiento offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registrado');
+                    })
+                    .catch(function(error) {
+                        console.log('Error registrando Service Worker:', error);
+                    });
+            });
+        }
+
+        // Limpiar cache automáticamente cada hora
+        setInterval(() => {
+            const now = new Date();
+            const lastClean = localStorage.getItem('lastCacheClean');
+
+            if (!lastClean || (now - new Date(lastClean)) > 3600000) { // 1 hora
+                cleanOldRecords();
+                localStorage.setItem('lastCacheClean', now.toISOString());
+            }
+        }, 3600000);
+
+    </script>
+</body>
+</html>
